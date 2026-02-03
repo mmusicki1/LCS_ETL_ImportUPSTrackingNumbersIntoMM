@@ -1,15 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using CommonModules;
 using ProcessEConnectPacket;
 using System.Data;
 using System.Data.SqlClient;
 using System.Data.Odbc;
 
-namespace LCS_ETL_ImportTrackingNumbersIntoMM
+namespace LCS_ETL_ImportUPSTrackingNumbersIntoMM
 {
 	class Program
 	{
@@ -25,7 +22,7 @@ namespace LCS_ETL_ImportTrackingNumbersIntoMM
 		static string PacketType = "1018"; //Add Tracking Number
 		static string eConnectPassword = "L0C0S08";
 		static Int32 AlertEmailFrequencyInMinutes = 15;
-		static string AlertEmailType = "LCS_ETL_ImportTrackingNumbersIntoMM";
+		static string AlertEmailType = "LCS_ETL_ImportUPSTrackingNumbersIntoMM";
 		static string JobName = "";
 		static int JobId = 0;
 		static CommonModules_Main cm = new CommonModules_Main();
@@ -42,7 +39,7 @@ namespace LCS_ETL_ImportTrackingNumbersIntoMM
 
 			foreach (DataRow row in dtTrckNbrs.Rows)
 			{
-				string FedExLogId = row["FedExLogId"].ToString();
+				string UPSLogId = row["UPSLogId"].ToString();
 				string MMInvoiceNumber = (string)row["InvoiceNbr"].ToString();
 				string MMOrderNumber = row["InvoiceNbr"].ToString();
 				string TrckNbr = (string)row["TrackingNbr"];
@@ -53,7 +50,7 @@ namespace LCS_ETL_ImportTrackingNumbersIntoMM
 
 				if (Int32.TryParse(MMInvoiceNumber, out MMInvoiceId))
 				{
-					int IsProcessed = ProcessTicket(FedExLogId, MMInvoiceId, MMOrderNumber, TrckNbr, ref Comment);
+					int IsProcessed = ProcessTicket(UPSLogId, MMInvoiceId, MMOrderNumber, TrckNbr, ref Comment);
 					if (IsProcessed == 1 ) 
 					{
 						IsUpdate = true; 
@@ -62,8 +59,8 @@ namespace LCS_ETL_ImportTrackingNumbersIntoMM
 				else
 				{
 					//ProcessErrorHeader = "ProcessTicket Error";
-					//ProcessError = "Invoice number: " + MMInvoiceNumber + " not numeric. (FedExLogId=" + FedExLogId + ")";
-					//AddErrorToList(FedExLogId, AlertEmailType + "; ProcessTicket");
+					//ProcessError = "Invoice number: " + MMInvoiceNumber + " not numeric. (UPSLogId=" + UPSLogId + ")";
+					//AddErrorToList(UPSLogId, AlertEmailType + "; ProcessTicket");
 
 					Comment = "Warning. Invoice number not numeric.";
 					IsUpdate = true;
@@ -71,7 +68,7 @@ namespace LCS_ETL_ImportTrackingNumbersIntoMM
 
 				if (IsUpdate)
 				{
-					UpdateIsProcessed(FedExLogId, Comment);
+					UpdateIsProcessed(UPSLogId, Comment);
 				}
 			}
 
@@ -81,21 +78,21 @@ namespace LCS_ETL_ImportTrackingNumbersIntoMM
 			}
 		}
 
-		static int ProcessTicket(string FedExLogId, Int32 MMInvoiceId, string MMOrderNumber, string TrckNbr, ref string Comment)
+		static int ProcessTicket(string UPSLogId, Int32 MMInvoiceId, string MMOrderNumber, string TrckNbr, ref string Comment)
 		{
 			int IsProcessed = 0;
-			if (IsMMInvoiceExists(FedExLogId, MMInvoiceId))
+			if (IsMMInvoiceExists(UPSLogId, MMInvoiceId))
 			{
-				if (!IsMMTrckNbrExistsForTheInvoice(FedExLogId, MMInvoiceId, TrckNbr))
+				if (!IsMMTrckNbrExistsForTheInvoice(UPSLogId, MMInvoiceId, TrckNbr))
 				{
-					string PacketStr = PreparePacket(FedExLogId, PacketType, MMInvoiceId.ToString(), MMOrderNumber, TrckNbr);
+					string PacketStr = PreparePacket(UPSLogId, PacketType, MMInvoiceId.ToString(), MMOrderNumber, TrckNbr);
 					int NewOrderId = 0; //don't really need this, but target function requires it
 
 					int PacketResponse = pp.ProcessPacket_Main(MMInvoiceId, "Invoice", HostIP, HostPort, PacketType, PacketStr, true, ref NewOrderId, ref ProcessErrorHeader, ref ProcessError);
 
 					if (PacketResponse != 1 || ProcessError != "") //Error
 					{
-						AddErrorToList(FedExLogId, AlertEmailType + "; ProcessTicket; ProcessPacket_Main (VB.NET dll)");
+						AddErrorToList(UPSLogId, AlertEmailType + "; ProcessTicket; ProcessPacket_Main (VB.NET dll)");
 					}
 					else
 					{
@@ -112,8 +109,8 @@ namespace LCS_ETL_ImportTrackingNumbersIntoMM
 			else
 			{
 				ProcessErrorHeader = "ProcessTicket Error";
-				ProcessError = "Invoice number: " + MMInvoiceId.ToString() + " not found in ManageMore. (FedExLogId=" + FedExLogId + ")";
-				AddErrorToList(FedExLogId, AlertEmailType + "; ProcessTicket");
+				ProcessError = "Invoice number: " + MMInvoiceId.ToString() + " not found in ManageMore. (UPSLogId=" + UPSLogId + ")";
+				AddErrorToList(UPSLogId, AlertEmailType + "; ProcessTicket");
 			}
 
 			return IsProcessed;
@@ -129,7 +126,7 @@ namespace LCS_ETL_ImportTrackingNumbersIntoMM
 					cnn.Open();
 					using (SqlDataAdapter da = new SqlDataAdapter("", cnn))
 					{
-						da.SelectCommand.CommandText = "select f.FedExLogId, isnull(f.InvoiceNbr,'') as InvoiceNbr, isnull(f.TrackingNbr,'') as TrackingNbr, f.[Date] from FedExLog f (nolock) where f.IsProcessed = 0";
+						da.SelectCommand.CommandText = "select f.UPSLogId, isnull(f.InvoiceNbr,'') as InvoiceNbr, isnull(f.TrackingNbr,'') as TrackingNbr, f.[Date] from UPSLog f (nolock) where f.IsProcessed = 0";
 						da.Fill(dt);
 					}
 				}
@@ -145,7 +142,7 @@ namespace LCS_ETL_ImportTrackingNumbersIntoMM
 			return dt;
 		}
 
-		static bool IsMMInvoiceExists(string FedExLogId, Int32 MMInvoiceId)
+		static bool IsMMInvoiceExists(string UPSLogId, Int32 MMInvoiceId)
 		{
 			bool isexists = false;
 
@@ -164,8 +161,8 @@ namespace LCS_ETL_ImportTrackingNumbersIntoMM
 						else
 						{
 							ProcessErrorHeader = "IsMMInvoiceExists";
-							ProcessError = "Could not find Invoice number: " + MMInvoiceId.ToString() + " in ManageMore. (FedExLogId = " + FedExLogId + ")";
-							AddErrorToList(FedExLogId, AlertEmailType + "; IsMMInvoiceExists");
+							ProcessError = "Could not find Invoice number: " + MMInvoiceId.ToString() + " in ManageMore. (UPSLogId = " + UPSLogId + ")";
+							AddErrorToList(UPSLogId, AlertEmailType + "; IsMMInvoiceExists");
 						}
 					}
 				}
@@ -174,7 +171,7 @@ namespace LCS_ETL_ImportTrackingNumbersIntoMM
 			return isexists;
 		}
 
-		static bool IsMMTrckNbrExistsForTheInvoice(string FedExLogId, Int32 MMInvoiceId, string TrckNbr)
+		static bool IsMMTrckNbrExistsForTheInvoice(string UPSLogId, Int32 MMInvoiceId, string TrckNbr)
 		{
 			bool isexists = true;
 
@@ -200,7 +197,7 @@ namespace LCS_ETL_ImportTrackingNumbersIntoMM
 			return isexists;
 		}
 
-		static string PreparePacket(string FedExLogId, string PacketTypeCode, string MMInvoiceNumber, string MMOrderNumber, string TrckNbr)
+		static string PreparePacket(string UPSLogId, string PacketTypeCode, string MMInvoiceNumber, string MMOrderNumber, string TrckNbr)
 		{
 			string packet = "";
 			try
@@ -212,7 +209,7 @@ namespace LCS_ETL_ImportTrackingNumbersIntoMM
 			{
 				ProcessErrorHeader = "Prepare Packet Error";
 				ProcessError = e.Message;
-				AddErrorToList(FedExLogId, AlertEmailType + "; PreparePacket");
+				AddErrorToList(UPSLogId, AlertEmailType + "; PreparePacket");
 			}
 			return packet;
 		}
@@ -255,10 +252,10 @@ namespace LCS_ETL_ImportTrackingNumbersIntoMM
 			}
 		}
 
-		static void AddErrorToList (string FedExLogId, string MethodPath)
+		static void AddErrorToList (string UPSLogId, string MethodPath)
 		{
 			ProcessErrorHeader = MethodPath + "; " + ProcessErrorHeader;
-			ProcessError = "Error. FedExLogId=" + FedExLogId + "; Error; " + ProcessError;
+			ProcessError = "Error. UPSLogId=" + UPSLogId + "; Error; " + ProcessError;
 			cm.DBA_ETL_Jobs_Log_Save(JobId, ProcessErrorHeader + "; " + ProcessError);
 			string[] err = { ProcessErrorHeader, ProcessError };
 			ErrorList.Add(err);
@@ -267,7 +264,7 @@ namespace LCS_ETL_ImportTrackingNumbersIntoMM
 			ProcessError = "";
 		}
 
-		static void UpdateIsProcessed (string FedExLogId, string Comment)
+		static void UpdateIsProcessed (string UPSLogId, string Comment)
 		{
 			try
 			{
@@ -276,13 +273,13 @@ namespace LCS_ETL_ImportTrackingNumbersIntoMM
 					cnn.Open();
 					using (SqlCommand cmd = new SqlCommand("", cnn))
 					{
-						cmd.CommandText = @"UPDATE FedExLog SET 
+						cmd.CommandText = @"UPDATE UPSLog SET 
 																IsProcessed = 1
 																,ProcessedDateTime = dbo.fnESTDate(GETDATE())
 																,ProcessingResult = @ProcessingResult
-															WHERE FedExLogId = @FedExLogId;";
+															WHERE UPSLogId = @UPSLogId;";
 
-						cmd.Parameters.AddWithValue("@FedExLogId", FedExLogId);
+						cmd.Parameters.AddWithValue("@UPSLogId", UPSLogId);
 						cmd.Parameters.AddWithValue("@ProcessingResult", Comment);
 						cmd.ExecuteNonQuery();
 					}
@@ -292,7 +289,7 @@ namespace LCS_ETL_ImportTrackingNumbersIntoMM
 			{
 				ProcessErrorHeader = "UpdateIsProcessed Error";
 				ProcessError = e.Message;
-				AddErrorToList(FedExLogId, AlertEmailType + "; UpdateIsProcessed");
+				AddErrorToList(UPSLogId, AlertEmailType + "; UpdateIsProcessed");
 
 			}
 		}

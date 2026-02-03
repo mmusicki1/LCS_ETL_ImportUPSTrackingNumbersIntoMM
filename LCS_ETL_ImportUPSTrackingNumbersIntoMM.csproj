@@ -6,8 +6,8 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{B07271C4-9778-4077-B388-A53A80586723}</ProjectGuid>
     <OutputType>Exe</OutputType>
-    <RootNamespace>LCS_ETL_ImportTrackingNumbersIntoMM</RootNamespace>
-    <AssemblyName>LCS_ETL_ImportTrackingNumbersIntoMM</AssemblyName>
+    <RootNamespace>LCS_ETL_ImportUPSTrackingNumbersIntoMM</RootNamespace>
+    <AssemblyName>LCS_ETL_ImportUPSTrackingNumbersIntoMM</AssemblyName>
     <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
